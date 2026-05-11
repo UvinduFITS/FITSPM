@@ -15,9 +15,13 @@ create table if not exists projects (
   end_date date,
   description text,
   client_name text,
+  project_url text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+-- Migration: add project_url to existing installs
+alter table projects add column if not exists project_url text;
 
 -- Project documents table
 create table if not exists project_documents (

@@ -7,7 +7,7 @@ import { Plus, Pencil, Trash2, Upload, X, Save } from 'lucide-react'
 
 const EMPTY_FORM = {
   name: '', tech_stack: '', project_handler: '', status: 'ongoing',
-  start_date: '', end_date: '', description: '', client_name: '',
+  start_date: '', end_date: '', description: '', client_name: '', project_url: '',
 }
 
 function parseTechStack(value) {
@@ -59,6 +59,7 @@ export default function Admin() {
       end_date:         project.end_date || '',
       description:      project.description || '',
       client_name:      project.client_name || '',
+      project_url:      project.project_url || '',
     })
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -83,6 +84,7 @@ export default function Admin() {
       status:          form.status,
       description:     form.description || null,
       client_name:     form.client_name || null,
+      project_url:     form.project_url ? form.project_url.trim() : null,
       start_date:      form.start_date || null,
       end_date:        form.end_date || null,
     }
@@ -203,6 +205,14 @@ export default function Admin() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
               <textarea name="description" value={form.description} onChange={handleChange} rows={3}
                 className={`${inputCls} resize-none`} {...focusStyle} placeholder="Brief project overview…" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Project URL <span className="text-gray-400 font-normal">(link to live site / repo)</span>
+              </label>
+              <input type="url" name="project_url" value={form.project_url} onChange={handleChange}
+                className={inputCls} {...focusStyle} placeholder="https://example.com" />
             </div>
 
             <div>

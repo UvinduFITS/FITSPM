@@ -86,6 +86,13 @@ export default function ProjectDetail() {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <StatusBadge status={project.status} />
+            {project.project_url && (
+              <a href={project.project_url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-white px-3 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#1a2d6b' }}>
+                <ExternalLink className="w-4 h-4" /> View Project
+              </a>
+            )}
             <Link to={`/admin?edit=${project.id}`}
               className="p-2 text-gray-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
               <Pencil className="w-4 h-4" />
