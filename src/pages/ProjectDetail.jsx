@@ -136,14 +136,14 @@ export default function ProjectDetail() {
           <h2 className="font-semibold text-gray-800 flex items-center gap-2">
             <FileText className="w-4 h-4 text-gray-400" /> Documentation
           </h2>
-          <span className="text-xs text-gray-400">{documents.length} file{documents.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-gray-400">{documents.length} document{documents.length !== 1 ? 's' : ''}</span>
         </div>
 
         {documents.length === 0 ? (
           <div className="px-6 py-10 text-center text-gray-400 text-sm">
-            No documents uploaded yet.{' '}
+            No documents linked yet.{' '}
             <Link to={`/admin?edit=${project.id}`} className="hover:underline" style={{ color: '#1a2d6b' }}>
-              Upload one
+              Add one
             </Link>
           </div>
         ) : (

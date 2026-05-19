@@ -3,12 +3,23 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import StatusBadge from '../components/projects/StatusBadge'
-import { Plus, Pencil, Trash2, Upload, X, Save } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Save, Link2 } from 'lucide-react'
 
 const EMPTY_FORM = {
   name: '', tech_stack: '', project_handler: '', status: 'ongoing',
   start_date: '', end_date: '', description: '', client_name: '', project_url: '',
 }
+
+const CLIENT_OPTIONS = [
+  'AirPark',
+  'Fits Cargo',
+  'Fits Express Parcel Delivery LLC',
+  'Fits Express Pvt Ltd',
+  'Fits Retail Pvt Ltd',
+  'World Travel Island',
+]
+
+const emptyDoc = () => ({ id: Date.now() + Math.random(), name: '', url: '' })
 
 function parseTechStack(value) {
   if (Array.isArray(value)) return value.join(', ')
@@ -29,7 +40,7 @@ export default function Admin() {
   const [loading, setLoading]       = useState(true)
   const [form, setForm]             = useState(EMPTY_FORM)
   const [editingId, setEditingId]   = useState(null)
-  const [file, setFile]             = useState(null)
+  const [docs, setDocs]             = useState([emptyDoc()])
   const [saving, setSaving]         = useState(false)
   const [showForm, setShowForm]     = useState(!!editIdParam)
 
@@ -48,7 +59,7 @@ export default function Admin() {
     }
   }, [editIdParam, projects]) // eslint-disable-line
 
-  const openEdit = (project) => {
+  const openEdit = async (project) => {
     setEditingId(project.id)
     setForm({
       name:             project.name || '',
@@ -61,13 +72,24 @@ export default function Admin() {
       client_name:      project.client_name || '',
       project_url:      project.project_url || '',
     })
+    // Load existing documents as link rows
+    const { data: existingDocs } = await supabase
+      .from('project_documents')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('uploaded_at', { ascending: true })
+    if (existingDocs && existingDocs.length > 0) {
+      setDocs(existingDocs.map((d) => ({ id: d.id, name: d.file_name || '', url: d.file_url || '' })))
+    } else {
+      setDocs([emptyDoc()])
+    }
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const cancelForm = () => {
     setShowForm(false); setEditingId(null)
-    setForm(EMPTY_FORM); setFile(null)
+    setForm(EMPTY_FORM); setDocs([emptyDoc()])
     setSearchParams({})
   }
 
@@ -102,17 +124,21 @@ export default function Admin() {
       toast.success('Project created')
     }
 
-    if (file && savedId) {
-      const ext = file.name.split('.').pop()
-      const filePath = `${savedId}/${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('project-documents').upload(filePath, file)
-      if (uploadError) {
-        toast.error(`File upload failed: ${uploadError.message}`)
-      } else {
-        const { data: { publicUrl } } = supabase.storage.from('project-documents').getPublicUrl(filePath)
-        await supabase.from('project_documents').insert({ project_id: savedId, file_url: publicUrl, file_name: file.name })
-        toast.success('Document uploaded')
+    // Save document links (only rows that have both a name and a URL)
+    const validDocs = docs.filter((d) => d.name.trim() && d.url.trim())
+    if (validDocs.length > 0 && savedId) {
+      // For edits: delete old docs then re-insert
+      if (editingId) {
+        await supabase.from('project_documents').delete().eq('project_id', savedId)
       }
+      const docRows = validDocs.map((d) => ({
+        project_id: savedId,
+        file_name:  d.name.trim(),
+        file_url:   d.url.trim(),
+      }))
+      const { error: docError } = await supabase.from('project_documents').insert(docRows)
+      if (docError) toast.error('Failed to save some documents')
+      else toast.success(`${validDocs.length} document${validDocs.length !== 1 ? 's' : ''} saved`)
     }
 
     setSaving(false); cancelForm(); fetchProjects()
@@ -163,8 +189,13 @@ export default function Admin() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Client Name</label>
-                <input name="client_name" value={form.client_name} onChange={handleChange}
-                  className={inputCls} {...focusStyle} placeholder="e.g. FitsExpress" />
+                <select name="client_name" value={form.client_name} onChange={handleChange}
+                  className={inputCls} {...focusStyle}>
+                  <option value="">— Select client —</option>
+                  {CLIENT_OPTIONS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Project Handler *</label>
@@ -215,22 +246,54 @@ export default function Admin() {
                 className={inputCls} {...focusStyle} placeholder="https://example.com" />
             </div>
 
+            {/* Document Links */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Upload Document <span className="text-gray-400 font-normal">(PDF, Word, Excel, etc.)</span>
-              </label>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors text-sm text-gray-600">
-                  <Upload className="w-4 h-4 text-gray-400" />
-                  {file ? <span className="font-medium" style={{ color: '#1a2d6b' }}>{file.name}</span> : 'Choose file'}
-                  <input type="file" onChange={(e) => setFile(e.target.files[0] || null)} className="hidden"
-                    accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.ppt,.pptx,.png,.jpg,.jpeg" />
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-medium text-gray-600">
+                  Documents <span className="text-gray-400 font-normal">(Google Drive links)</span>
                 </label>
-                {file && (
-                  <button type="button" onClick={() => setFile(null)} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setDocs((d) => [...d, emptyDoc()])}
+                  className="flex items-center gap-1 text-xs font-medium hover:opacity-70 transition-opacity"
+                  style={{ color: '#1a2d6b' }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Document
+                </button>
+              </div>
+              <div className="space-y-2">
+                {docs.map((doc, i) => (
+                  <div key={doc.id} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={doc.name}
+                      onChange={(e) => setDocs((d) => d.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                      placeholder="Document name"
+                      className="w-40 flex-shrink-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none bg-white"
+                      {...focusStyle}
+                    />
+                    <div className="relative flex-1">
+                      <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <input
+                        type="url"
+                        value={doc.url}
+                        onChange={(e) => setDocs((d) => d.map((x, j) => j === i ? { ...x, url: e.target.value } : x))}
+                        placeholder="https://drive.google.com/..."
+                        className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none bg-white"
+                        {...focusStyle}
+                      />
+                    </div>
+                    {docs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setDocs((d) => d.filter((_, j) => j !== i))}
+                        className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
